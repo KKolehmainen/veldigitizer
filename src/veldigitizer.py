@@ -24,7 +24,7 @@ class UI(ttk.Frame):
         self.canvas.create_image((0,0), anchor="nw", image=image_tk)
         self.canvas.pack()
 
-        global prev 
+        global prev
         prev = 0
         def get_coords(event):
             x, y = event.x, event.y
@@ -43,7 +43,7 @@ class UI(ttk.Frame):
                 prev -= 1
             else:
                 print("Already at oldest exchange!")
-        
+
         self.undo = ttk.Button(self, text="Undo", command=del_prev)
         self.undo.pack()
 
