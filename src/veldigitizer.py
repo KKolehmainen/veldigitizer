@@ -26,7 +26,8 @@ class UI(ttk.Frame):
         self.canvas.create_image((0,0), anchor="nw", image=image_tk)
         self.canvas.pack()
 
-        prevs = []
+        scale_prevs = []
+        vel_prevs = []
         scale_coords = []
         input_coords = []
         depths = []
@@ -37,27 +38,38 @@ class UI(ttk.Frame):
 
         def scale_dis():
             scale_button["state"] = tk.DISABLED
-            vel_button["state"] = tk.NORMAL
+            self.undo["state"] = tk.DISABLED
+            scale_coords.clear()
+            input_coords.clear()
+            depths.clear()
+            veldata.clear()
+            for _ in range(len(scale_prevs)):
+                self.canvas.delete(scale_prevs.pop())
+            for _ in range(len(vel_prevs)):
+                self.canvas.delete(vel_prevs.pop())
+            self.mode_label["text"] = "Scale mode on"
 
         def scale_ena():
             scale_button["state"] = tk.NORMAL
-            vel_button["state"] =tk.DISABLED
+            self.undo["state"] = tk.NORMAL
+            self.mode_label["text"] = "Velocity mode on"
 
-
+        self.mode_label = ttk.Label(self, text="Scale mode on")
+        self.mode_label.pack()
         scale_button = ttk.Button(self, text="Scale mode", state=tk.DISABLED, command=scale_dis)
         scale_button.pack()
-        vel_button = ttk.Button(self, text="Velocity mode", command=scale_ena)
-        vel_button.pack()
 
         def get_input_xy():
             input_window = tk.Toplevel(self)
             x_entry = tk.Entry(input_window, text="X coordinate")
+            x_entry.insert(0,"0")
             y_entry = tk.Entry(input_window, text="Y coordinate")
+            y_entry.insert(0,"0")
             x_entry.pack()
             y_entry.pack()
 
-            val1 = -1
-            val2 = -1
+            val1 = None
+            val2 = None
 
             def submit_input():
                 nonlocal val1, val2
@@ -73,6 +85,7 @@ class UI(ttk.Frame):
         def get_depth():
             input_window = tk.Toplevel(self)
             depth = tk.Entry(input_window, text="Depth")
+            depth.insert(0,"0")
             depth.pack()
             depth_val = None
 
@@ -84,7 +97,6 @@ class UI(ttk.Frame):
             submit_button = tk.Button(input_window, text="Submit", command=submit_input)
             submit_button.pack()
             self.wait_window(input_window)
-            print(depth_val)
             return depth_val
         
         def point_at_distance(point1, point2, distance):
@@ -117,7 +129,6 @@ class UI(ttk.Frame):
 
         def get_coords(event):
             x, y = event.x, event.y
-            print(x, y)
             r = 4
             if str(scale_button["state"]) == "disabled":
                 if len(scale_coords) < 2:
@@ -128,7 +139,8 @@ class UI(ttk.Frame):
                 scale_coords.append((x,y))
                 col = "blue"
                 if len(scale_coords) > 3:
-                    scale_dis()
+                    scale_ena()
+                scale_prevs.append(self.canvas.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
             else:
                 try:
                     vel = float(entry.get())
@@ -143,17 +155,18 @@ class UI(ttk.Frame):
                 X_coord, Y_coord = point_at_distance(input_coords[0], input_coords[1], (x-x1)/(x2-x1) * dist)
                 veldata.append((X_coord, Y_coord, (y-y1)/(y2-y1) * depths[1],vel))
                 col = "red"
-            prevs.append(self.canvas.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
+                vel_prevs.append(self.canvas.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
 
         self.canvas.bind("<Button-1>", get_coords)
 
         def del_prev():
-            if len(prevs) > 0:
-                self.canvas.delete(prevs.pop())
+            if len(vel_prevs) > 0:
+                self.canvas.delete(vel_prevs.pop())
+                veldata.pop()
             else:
                 print("Already at oldest exchange!")
 
-        self.undo = ttk.Button(self, text="Undo", command=del_prev)
+        self.undo = ttk.Button(self, text="Undo", state=tk.DISABLED, command=del_prev)
         self.undo.pack()
 
         def save_vel():
