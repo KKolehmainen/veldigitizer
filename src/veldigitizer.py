@@ -164,15 +164,30 @@ class UI(ttk.Frame):
                 self.canvas.delete(vel_prevs.pop())
                 veldata.pop()
             else:
-                print("Already at oldest exchange!")
+                print("Already at oldest change!")
 
         self.undo = ttk.Button(self, text="Undo", state=tk.DISABLED, command=del_prev)
         self.undo.pack()
 
+        self.tickbox_var = tk.IntVar()
+        self.tickbox = tk.Checkbutton(self,
+                                      text="Convert negative depths to zero",
+                                      variable=self.tickbox_var,
+                                      onvalue=1,
+                                      offvalue=0)
+        self.tickbox.select()
+        self.tickbox.pack()
         def save_vel():
             with open("testfile.txt", "wt") as f:
-                for row in veldata:
-                    f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
+                if self.tickbox_var.get() == 1:
+                    for row in veldata:
+                        if row[2] < 0.0:
+                            f.write(f"{row[0]} {row[1]} {0.0} {row[3]}\n")
+                        else:
+                            f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
+                else:
+                    for row in veldata:
+                        f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
 
         self.save = ttk.Button(self, text="Save velocities", command=save_vel)
         self.save.pack()
