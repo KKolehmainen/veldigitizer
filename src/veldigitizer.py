@@ -1,5 +1,5 @@
 import math
-from tkinter import Tk, ttk, Canvas
+from tkinter import Tk, ttk, Canvas, filedialog
 import tkinter as tk
 from PIL import Image, ImageTk
 
@@ -8,7 +8,6 @@ class App(Tk):
         super().__init__()
         self.title("Veldigitizer")
         self.geometry("2000x600")
-
         self.ui = UI(self)
 
         self.mainloop()
@@ -16,10 +15,24 @@ class App(Tk):
 class UI(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
+
+        img_file = ""
+
+        def open_file_dialog():
+            nonlocal img_file
+            img_file = filedialog.askopenfilename()
+            self.file_open_window.destroy()
+
+        self.file_open_window = tk.Toplevel(self)
+        file_button = tk.Button(self.file_open_window, text="Open model file",
+                                command=open_file_dialog)
+        file_button.pack()
+        self.wait_window(self.file_open_window)
+
         ttk.Label(self, text="Model", font="Calibri 24").pack()
         self.pack()
 
-        image = Image.open("../fennolora_d-i.png")
+        image = Image.open(img_file)
         global image_tk
         image_tk = ImageTk.PhotoImage(image)
         self.canvas = Canvas(self, width=image.size[0], height=image.size[1])
@@ -177,19 +190,24 @@ class UI(ttk.Frame):
                                       offvalue=0)
         self.tickbox.select()
         self.tickbox.pack()
-        def save_vel():
-            with open("testfile.txt", "wt") as f:
-                if self.tickbox_var.get() == 1:
-                    for row in veldata:
-                        if row[2] < 0.0:
-                            f.write(f"{row[0]} {row[1]} {0.0} {row[3]}\n")
-                        else:
-                            f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
-                else:
-                    for row in veldata:
-                        f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
 
-        self.save = ttk.Button(self, text="Save velocities", command=save_vel)
+        def save_vel():
+            save_file = filedialog.asksaveasfilename()
+            try:
+                with open(save_file, "wt") as f:
+                    if self.tickbox_var.get() == 1:
+                        for row in veldata:
+                            if row[2] < 0.0:
+                                f.write(f"{row[0]} {row[1]} {0.0} {row[3]}\n")
+                            else:
+                                f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
+                    else:
+                        for row in veldata:
+                            f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
+            except IOError:
+                print("An error occurred while saving the file")
+
+        self.save = ttk.Button(self, text="Save as", command=save_vel)
         self.save.pack()
 
 if __name__ == "__main__":
