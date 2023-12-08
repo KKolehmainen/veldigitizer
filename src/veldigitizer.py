@@ -11,6 +11,5 @@ class App(Tk):
         self.mainloop()
 
 
-
 if __name__ == "__main__":
     app = App()
