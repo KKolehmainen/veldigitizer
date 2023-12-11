@@ -1,7 +1,7 @@
 from tkinter import Canvas
 from PIL import ImageTk
 
-class Image_canvas(Canvas):
+class ImageCanvas(Canvas):
     def __init__(self, parent, image):
         super().__init__(parent, width=image.size[0], height=image.size[1])
         self.image_tk = ImageTk.PhotoImage(image)

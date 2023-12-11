@@ -2,14 +2,14 @@ from tkinter import ttk, filedialog
 import tkinter as tk
 from PIL import Image
 from digitized import Digitized
-from imagecanvas import Image_canvas
+from imagecanvas import ImageCanvas
 
 class UI(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
         self.pack()
         self.image = self.get_file()
-        self.canvas = Image_canvas(self, self.image)
+        self.canvas = ImageCanvas(self, self.image)
         self.create_widgets()
         self.canvas.bind("<Button-1>", self.get_coords)
         self.digitized = Digitized()
