@@ -1,8 +1,8 @@
-import math
-from utils import point_at_distance
-from tkinter import ttk, Canvas, filedialog
+from tkinter import ttk, filedialog
 import tkinter as tk
-from PIL import Image, ImageTk
+from PIL import Image
+from digitized import Digitized
+from imagecanvas import Image_canvas
 
 class UI(ttk.Frame):
     def __init__(self, parent):
@@ -124,80 +124,5 @@ class UI(ttk.Frame):
         else:
             print("Already at oldest change!")
 
-class Digitized():
-    def __init__(self) -> None:
-        self.scale_coords = []  #canvas coordinates for scaling
-        self.input_coords = []  #real coordinates for scaling
-        self.depths = []  #depths for scaling
-        self.veldata = []  #velocity data (x,y,z,vel)
 
-    def clear_data(self):
-        self.scale_coords = []
-        self.input_coords = []
-        self.depths = []
-        self.veldata = []
 
-    def add_scale_point(self, x, y, input_x, input_y):
-        self.input_coords.append((input_x,input_y))
-        self.scale_coords.append((x,y))
-
-    def add_vel_point(self, x, y, vel):
-        
-        dist = math.dist(self.input_coords[0], self.input_coords[1])
-        x1 = self.scale_coords[0][0]
-        y1 = self.scale_coords[2][1]
-        x2 = self.scale_coords[1][0]
-        y2 = self.scale_coords[3][1]
-        X_coord, Y_coord = point_at_distance(self.input_coords[0], self.input_coords[1], (x-x1)/(x2-x1) * dist)
-        self.veldata.append((X_coord, Y_coord, (y-y1)/(y2-y1) * self.depths[1],vel))
-
-    def add_depth(self, x, y, depth):
-        self.depths.append(depth)
-        self.scale_coords.append((x,y))
-
-    def pop_veldata(self):
-        return self.veldata.pop()
-
-    def save_vel(self, convert_depths=True):
-        self.save_file = filedialog.asksaveasfilename()
-        try:
-            with open(self.save_file, "wt") as f:
-                if convert_depths:
-                    for row in self.veldata:
-                        if row[2] < 0.0:
-                            f.write(f"{row[0]} {row[1]} {0.0} {row[3]}\n")
-                        else:
-                            f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
-                else:
-                    for row in self.veldata:
-                        f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
-        except IOError:
-            print("An error occurred while saving the file")
-
-class Image_canvas(Canvas):
-    def __init__(self, parent, image):
-        super().__init__(parent, width=image.size[0], height=image.size[1])
-        self.image_tk = ImageTk.PhotoImage(image)
-        self.create_image((0,0), anchor="nw", image=self.image_tk)
-        self.pack()
-        self.scale_prevs = []
-        self.vel_prevs = []
-
-    def add_scale_oval(self, x, y):
-        r = 4
-        col = "blue"
-        self.scale_prevs.append(self.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
-
-    def add_vel_oval(self, x, y):
-        r = 4
-        col = "red"
-        self.vel_prevs.append(self.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
-
-    def delete_oval(self):
-        self.delete(self.vel_prevs.pop())
-
-    def del_all_ovals(self):
-        for _ in range(len(self.scale_prevs)):
-            self.delete(self.scale_prevs.pop())
-        for _ in range(len(self.vel_prevs)):
-            self.delete(self.vel_prevs.pop())
