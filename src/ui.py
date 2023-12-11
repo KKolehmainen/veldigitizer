@@ -7,28 +7,26 @@ from PIL import Image, ImageTk
 class UI(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
+        self.pack()
+        self.image = self.get_file()
+        self.canvas = Image_canvas(self, self.image)
+        self.create_widgets()
+        self.canvas.bind("<Button-1>", self.get_coords)
+        self.digitized = Digitized()
 
-        self.file_open_window = tk.Toplevel(self)
-        self.file_button = tk.Button(self.file_open_window, text="Open model file",
+    def get_file(self):
+        self.file_button = tk.Button(self, text="Open model file",
                                 command=self.open_file_dialog)
         self.file_button.pack()
-        self.wait_window(self.file_open_window)
+        self.wait_window(self.file_button)
+        return Image.open(self.img_file)
+    
+    def open_file_dialog(self):
+        self.img_file = filedialog.askopenfilename()
+        self.file_button.destroy()
 
+    def create_widgets(self):
         ttk.Label(self, text="Model", font="Calibri 24").pack()
-        self.pack()
-
-        self.image = Image.open(self.img_file)
-        self.image_tk = ImageTk.PhotoImage(self.image)
-        self.canvas = Canvas(self, width=self.image.size[0], height=self.image.size[1])
-        self.canvas.create_image((0,0), anchor="nw", image=self.image_tk)
-        self.canvas.pack()
-
-        self.scale_prevs = []
-        self.vel_prevs = []
-        self.scale_coords = []
-        self.input_coords = []
-        self.depths = []
-        self.veldata = []
 
         self.entry = ttk.Entry(self)
         self.entry.pack()
@@ -37,7 +35,6 @@ class UI(ttk.Frame):
         self.mode_label.pack()
         self.scale_button = ttk.Button(self, text="Scale mode", state=tk.DISABLED, command=self.scale_dis)
         self.scale_button.pack()
-        self.canvas.bind("<Button-1>", self.get_coords)
         self.undo = ttk.Button(self, text="Undo", state=tk.DISABLED, command=self.del_prev)
         self.undo.pack()
 
@@ -45,34 +42,33 @@ class UI(ttk.Frame):
         self.tickbox = tk.Checkbutton(self,
                                       text="Convert negative depths to zero",
                                       variable=self.tickbox_var,
-                                      onvalue=1,
-                                      offvalue=0)
+                                      onvalue=True,
+                                      offvalue=False)
         self.tickbox.select()
         self.tickbox.pack()
-        self.save = ttk.Button(self, text="Save as", command=self.save_vel)
+        self.save = ttk.Button(self, text="Save as",
+                               command=lambda: self.digitized.save_vel(self.tickbox_var.get()))
         self.save.pack()
 
-    def open_file_dialog(self):
-        self.img_file = filedialog.askopenfilename()
-        self.file_open_window.destroy()
-
-    def scale_dis(self):
-        self.scale_button["state"] = tk.DISABLED
-        self.undo["state"] = tk.DISABLED
-        self.scale_coords.clear()
-        self.input_coords.clear()
-        self.depths.clear()
-        self.veldata.clear()
-        for _ in range(len(self.scale_prevs)):
-            self.canvas.delete(self.scale_prevs.pop())
-        for _ in range(len(self.vel_prevs)):
-            self.canvas.delete(self.vel_prevs.pop())
-        self.mode_label["text"] = "Scale mode on"
-
-    def scale_ena(self):
-        self.scale_button["state"] = tk.NORMAL
-        self.undo["state"] = tk.NORMAL
-        self.mode_label["text"] = "Velocity mode on"
+    def get_coords(self, event):
+        x, y = event.x, event.y
+        if str(self.scale_button["state"]) == "disabled":
+            if len(self.digitized.scale_coords) < 2:
+                input_x, input_y = self.get_input_xy()
+                self.digitized.add_scale_point(x, y, input_x, input_y)
+            else:
+                self.digitized.add_depth(x, y, self.get_depth())
+            if len(self.digitized.scale_coords) > 3:
+                self.scale_ena()
+            self.canvas.add_scale_oval(x, y)
+        else:
+            try:
+                vel = float(self.entry.get())
+                self.digitized.add_vel_point(x, y, vel)
+                self.canvas.add_vel_oval(x, y)
+            except:
+                print("Please enter a valid velocity value!")
+                return
 
     def get_input_xy(self):
         input_window = tk.Toplevel(self)
@@ -83,79 +79,90 @@ class UI(ttk.Frame):
         x_entry.pack()
         y_entry.pack()
 
-        val1 = None
-        val2 = None
-
-        def submit_input():
-            nonlocal val1, val2
-            val1 = float(x_entry.get())
-            val2 = float(y_entry.get())
-            input_window.destroy()
-
-        submit_button = tk.Button(input_window, text="Submit", command=submit_input)
+        submit_button = tk.Button(input_window,
+                                  text="Submit",
+                                  command=lambda: self.submit_input(input_window, x_entry, y_entry))
         submit_button.pack()
         self.wait_window(input_window)
-        return val1, val2
-
+        return tuple(self.vals)
+    
     def get_depth(self):
         input_window = tk.Toplevel(self)
         depth = tk.Entry(input_window, text="Depth")
         depth.insert(0,"0")
         depth.pack()
-        depth_val = None
 
-        def submit_input():
-            nonlocal depth_val
-            depth_val = float(depth.get())
-            input_window.destroy()
-
-        submit_button = tk.Button(input_window, text="Submit", command=submit_input)
+        submit_button = tk.Button(input_window,
+                                  text="Submit",
+                                  command=lambda: self.submit_input(input_window, depth)) 
         submit_button.pack()
         self.wait_window(input_window)
-        return depth_val
-        
-    def get_coords(self, event):
-        x, y = event.x, event.y
-        r = 4
-        if str(self.scale_button["state"]) == "disabled":
-            if len(self.scale_coords) < 2:
-                input_x, input_y = self.get_input_xy()
-                self.input_coords.append((input_x,input_y))
-            else:
-                self.depths.append(self.get_depth())
-            self.scale_coords.append((x,y))
-            col = "blue"
-            if len(self.scale_coords) > 3:
-                self.scale_ena()
-            self.scale_prevs.append(self.canvas.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
-        else:
-            try:
-                vel = float(self.entry.get())
-            except:
-                print("Please enter a valid velocity value!")
-                return
-            dist = math.dist(self.input_coords[0], self.input_coords[1])
-            x1 = self.scale_coords[0][0]
-            y1 = self.scale_coords[2][1]
-            x2 = self.scale_coords[1][0]
-            y2 = self.scale_coords[3][1]
-            X_coord, Y_coord = point_at_distance(self.input_coords[0], self.input_coords[1], (x-x1)/(x2-x1) * dist)
-            self.veldata.append((X_coord, Y_coord, (y-y1)/(y2-y1) * self.depths[1],vel))
-            col = "red"
-            self.vel_prevs.append(self.canvas.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
+        return self.vals[0] 
+
+    def submit_input(self, input_window, *entries):
+        self.vals = []
+        for entry in entries:
+            self.vals.append(float(entry.get()))
+        input_window.destroy()
+
+    def scale_dis(self):
+        self.mode_label["text"] = "Velocity mode on"
+        self.scale_button["state"] = tk.DISABLED
+        self.undo["state"] = tk.DISABLED
+        self.digitized.clear_data()
+        self.canvas.del_all_ovals()
+
+    def scale_ena(self):
+        self.mode_label["text"] = "Scale mode on"
+        self.scale_button["state"] = tk.NORMAL
+        self.undo["state"] = tk.NORMAL
 
     def del_prev(self):
-        if len(self.vel_prevs) > 0:
-            self.canvas.delete(self.vel_prevs.pop())
-            self.veldata.pop()
+        if len(self.canvas.vel_prevs) > 0 and len(self.digitized.veldata) > 0:
+            self.digitized.pop_veldata()
+            self.canvas.delete_oval()
         else:
             print("Already at oldest change!")
 
-    def save_vel(self):
+class Digitized():
+    def __init__(self) -> None:
+        self.scale_coords = []  #canvas coordinates for scaling
+        self.input_coords = []  #real coordinates for scaling
+        self.depths = []  #depths for scaling
+        self.veldata = []  #velocity data (x,y,z,vel)
+
+    def clear_data(self):
+        self.scale_coords = []
+        self.input_coords = []
+        self.depths = []
+        self.veldata = []
+
+    def add_scale_point(self, x, y, input_x, input_y):
+        self.input_coords.append((input_x,input_y))
+        self.scale_coords.append((x,y))
+
+    def add_vel_point(self, x, y, vel):
+        
+        dist = math.dist(self.input_coords[0], self.input_coords[1])
+        x1 = self.scale_coords[0][0]
+        y1 = self.scale_coords[2][1]
+        x2 = self.scale_coords[1][0]
+        y2 = self.scale_coords[3][1]
+        X_coord, Y_coord = point_at_distance(self.input_coords[0], self.input_coords[1], (x-x1)/(x2-x1) * dist)
+        self.veldata.append((X_coord, Y_coord, (y-y1)/(y2-y1) * self.depths[1],vel))
+
+    def add_depth(self, x, y, depth):
+        self.depths.append(depth)
+        self.scale_coords.append((x,y))
+
+    def pop_veldata(self):
+        return self.veldata.pop()
+
+    def save_vel(self, convert_depths=True):
         self.save_file = filedialog.asksaveasfilename()
         try:
             with open(self.save_file, "wt") as f:
-                if self.tickbox_var.get() == 1:
+                if convert_depths:
                     for row in self.veldata:
                         if row[2] < 0.0:
                             f.write(f"{row[0]} {row[1]} {0.0} {row[3]}\n")
@@ -166,3 +173,31 @@ class UI(ttk.Frame):
                         f.write(f"{row[0]} {row[1]} {row[2]} {row[3]}\n")
         except IOError:
             print("An error occurred while saving the file")
+
+class Image_canvas(Canvas):
+    def __init__(self, parent, image):
+        super().__init__(parent, width=image.size[0], height=image.size[1])
+        self.image_tk = ImageTk.PhotoImage(image)
+        self.create_image((0,0), anchor="nw", image=self.image_tk)
+        self.pack()
+        self.scale_prevs = []
+        self.vel_prevs = []
+
+    def add_scale_oval(self, x, y):
+        r = 4
+        col = "blue"
+        self.scale_prevs.append(self.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
+
+    def add_vel_oval(self, x, y):
+        r = 4
+        col = "red"
+        self.vel_prevs.append(self.create_oval(x-r,y-r,x+r,y+r, fill=col, outline=col))
+
+    def delete_oval(self):
+        self.delete(self.vel_prevs.pop())
+
+    def del_all_ovals(self):
+        for _ in range(len(self.scale_prevs)):
+            self.delete(self.scale_prevs.pop())
+        for _ in range(len(self.vel_prevs)):
+            self.delete(self.vel_prevs.pop())
